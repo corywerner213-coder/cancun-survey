@@ -1017,26 +1017,27 @@ let allResponses = [];
             }
         }
 
-        function saveResponse(formData, scores, weights, prefScores, rankScores, recommended, gut, finalChoice) {
-            const response = {
-                name: formData.get('name'),
-                timestamp: new Date().toISOString(),
-                scores, weights,
-                prefScores, rankScores,
-                recommended: recommended,
-                gutChoice: gut,
-                finalChoice: finalChoice,
-                rankings: {
-                    epm: formData.get('rank_epm'),
-                    erc: formData.get('rank_erc'),
-                    smb: formData.get('rank_smb'),
-                    me: formData.get('rank_me')
-                }
-            };
-            const responses = JSON.parse(localStorage.getItem('cancunResponses') || '[]');
-            responses.push(response);
-            localStorage.setItem('cancunResponses', JSON.stringify(responses));
+       async function saveResponse(formData, scores, weights, prefScores, rankScores, recommended, gut, finalChoice) {
+    const response = {
+        id: crypto.randomUUID(),
+        name: formData.get('name'),
+        timestamp: new Date().toISOString(),
+        scores, weights,
+        prefScores, rankScores,
+        recommended,
+        gutChoice: gut,
+        finalChoice,
+        rankings: {
+            epm: formData.get('rank_epm'),
+            erc: formData.get('rank_erc'),
+            smb: formData.get('rank_smb'),
+            me: formData.get('rank_me')
         }
+    };
+
+    await saveResponseToServer(response);
+}
+
 // ===============================
 // SHARED STORAGE FUNCTIONS
 // ===============================
