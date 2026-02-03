@@ -818,7 +818,12 @@ let allResponses = [];
             document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
             document.getElementById(page + 'Page').classList.add('active');
             document.querySelector(`[onclick="showPage('${page}')"]`).classList.add('active');
-            if (page === 'admin') updateAdminDashboard();
+            if (page === 'admin') {
+    loadResponses().then(() => {
+        updateAdminDashboard();
+    });
+}
+
         }
 
         // Progress bar
