@@ -1086,6 +1086,7 @@ async function saveResponseWithChoice(finalChoice, scores, weights, prefScores, 
 function showFinalSubmission(resort) {
     document.getElementById('finalSubmission').style.display = 'block';
     document.getElementById('finalChoiceDisplay').textContent = RESORT_NAMES[resort];
+    showPage('admin');
 }
 
 // ============================================================
