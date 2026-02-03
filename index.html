@@ -1349,12 +1349,22 @@ document.getElementById('surveyForm').addEventListener('change', function() {
 loadCloudData();
     });
     // clear data
+// This function clears the group database, not just the form
 function clearAllData() {
-    if (confirm("Are you sure you want to delete ALL group results? This cannot be undone.")) {
-        // This wipes the saved data from your browser
+    // 1. Safety Check
+    if (confirm("⚠️ WARNING: This will permanently delete ALL previous group results. Are you sure?")) {
+        
+        // 2. This deletes the "Database" folder in your browser
         localStorage.removeItem('surveyResponses');
         
-        // This refreshes the dashboard so it shows 0 results
+        // 3. This tells the code the current list is now empty
+        allResponses = [];
+        
+        // 4. Update the visual charts and tables to show 0
+        updateAdminDashboard();
+        
+        // 5. Success message and refresh
+        alert("Group results have been wiped clean.");
         location.reload(); 
     }
 }
