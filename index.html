@@ -1067,7 +1067,8 @@ async function saveResponseToServer(response) {
 
         // Admin Dashboard
         function updateAdminDashboard() {
-            const responses = JSON.parse(localStorage.getItem('cancunResponses') || '[]');
+           const responses = allResponses;
+
             document.getElementById('responseCount').textContent = responses.length;
 
             if (responses.length === 0) {
@@ -1179,7 +1180,12 @@ async function saveResponseToServer(response) {
         }
 
         // Init
-        updateAdminDashboard();
+        // Init
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadResponses();
+    updateAdminDashboard();
+});
+
     </script>
 </body>
 </html>
