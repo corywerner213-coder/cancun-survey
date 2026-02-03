@@ -1319,7 +1319,8 @@ function resetAndRetake() {
     document.getElementById('finalSubmission').style.display = 'none';
     
     // Go to survey page
-    showPage('survey');
+    showPage('admin');
+    document.getElementById('adminPage').classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
