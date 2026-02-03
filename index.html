@@ -1337,14 +1337,3 @@ document.getElementById('surveyForm').addEventListener('change', function() {
     });
     if (document.getElementById('userName').value.trim()) answered++;
     
-    const total = 21; // 12 ratings + 4 rankings + gut + 3 additional + name
-    const pct = Math.min((answered / total) * 100, 100);
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressText').textContent = answered;
-});
-
-// Load data on start
-loadCloudData();
-</script>
-</body>
-</html>
