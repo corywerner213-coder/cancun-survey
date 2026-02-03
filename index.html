@@ -821,32 +821,25 @@ let allResponses = [];
 
         // Page navigation
 function showPage(page) {
-    // Hide all pages
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    // Do NOT override results view
+    if (showingResults && page === 'survey') {
+        return;
+    }
 
-    // Deactivate tabs
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
 
-    // Activate requested page
     const pageEl = document.getElementById(page + 'Page');
     if (pageEl) pageEl.classList.add('active');
 
-    // Activate nav tab safely
     const tab = document.querySelector(`.nav-tab[onclick="showPage('${page}')"]`);
     if (tab) tab.classList.add('active');
 
-    // Load admin data ONLY when needed
     if (page === 'admin') {
-    loadResponses().then(() => {
-        updateAdminDashboard();
-    });
-}
-
+        loadResponses().then(updateAdminDashboard);
     }
 }
 
-
-        }
 
         // Progress bar
         function updateProgress() {
@@ -956,6 +949,8 @@ function showPage(page) {
         let calculatedWinner = null;
         let gutChoice = null;
         let finalSubmissionChoice = null;
+        let showingResults = false;
+
 
         document.getElementById('surveyForm').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -1007,17 +1002,12 @@ function showPage(page) {
             document.getElementById('whyList').innerHTML = getReasons(weights, calculatedWinner).map(r => `<li>${r}</li>`).join('');
 
             // Show results
-
+// Show results (ONCE)
 document.getElementById('resultsContainer').classList.add('show');
 document.querySelector('.progress-container').style.display = 'none';
-window.scrollTo({top: 0, behavior: 'smooth'});
+document.getElementById('surveyPage').classList.add('results-mode');
+window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            document.getElementById('resultsContainer').classList.add('show');
-            document.querySelector('.progress-container').style.display = 'none';
-            window.scrollTo({top: 0, behavior: 'smooth'});
-            document.getElementById('surveyPage').classList.add('results-mode');
-
-        });
 
         function submitFinalChoice(choice) {
             const { scores, weights, prefScores, rankScores } = calculateScores(currentFormData);
@@ -1262,10 +1252,7 @@ if (responses.length === 0) {
 
         // Init
         // Init
-document.addEventListener("DOMContentLoaded", async () => {
-    await loadResponses();
-    updateAdminDashboard();
-});
+
 function resetSurvey() {
     // Show form again
     document.getElementById('surveyForm').style.display = 'block';
