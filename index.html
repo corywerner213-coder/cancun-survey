@@ -837,20 +837,20 @@ let finalSubmissionChoice = null;
    NAVIGATION
 ========================================================= */
 function showPage(pageId) {
-  // 1. Update the tabs (📝 Take Survey vs 📊 View Results) 
+  // 1. Update the tabs at the top (styling)
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.remove('active');
     if(tab.getAttribute('onclick').includes(pageId)) tab.classList.add('active');
   });
 
-  // 2. Switch between the survey and admin pages
+  // 2. Switch between the survey and group results pages
   document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
   document.getElementById(pageId + 'Page').classList.add('active');
 
-  // 3. Logic for the "Take Survey" tab
+  // 3. SPECIAL FIX: Handle the survey page state
   if (pageId === 'survey') {
-    // If they already finished the survey, show their results. 
-    // Otherwise, show the blank form.
+    // If you already finished the survey, it shows your results.
+    // Otherwise, it shows the blank form.
     if (showingResults) {
       document.getElementById('surveyForm').style.display = 'none';
       document.getElementById('resultsContainer').classList.add('show');
@@ -860,9 +860,9 @@ function showPage(pageId) {
     }
   } 
   
-  // 4. Logic for the "View Results" tab
+  // 4. SPECIAL FIX: Refresh the dashboard when you click the Results tab
   if (pageId === 'admin') {
-    updateAdminDashboard(); // Ensure data is fresh
+    updateAdminDashboard();
   }
 }
 /* =========================================================
@@ -1034,9 +1034,12 @@ async function persistResponse(scores, weights, prefScores, rankScores) {
 ========================================================= */
 function updateAdminDashboard() {
   const responses = allResponses;
+  
+  // Update the count at the top
   const countBadge = document.getElementById('responseCount');
   if (countBadge) countBadge.textContent = responses.length;
 
+  // Show "No Responses" if empty
   if (!responses || responses.length === 0) {
     document.getElementById('noResponses').style.display = 'block';
     document.getElementById('hasResponses').style.display = 'none';
@@ -1046,7 +1049,7 @@ function updateAdminDashboard() {
   document.getElementById('noResponses').style.display = 'none';
   document.getElementById('hasResponses').style.display = 'block';
 
-  // Tally votes: Use finalChoice IF it exists, otherwise use Recommended
+  // Tally votes: Use the Final Choice if available, otherwise use Recommended
   const counts = { epm: 0, erc: 0, smb: 0, me: 0 };
   responses.forEach(r => {
     const vote = r.finalChoice || r.recommended; 
@@ -1064,13 +1067,14 @@ function updateAdminDashboard() {
     document.getElementById('groupWinnerScore').textContent = `${sorted[0][1]} Total Votes`;
   }
 
-  // Update the visual progress bars for each resort [cite: 71-75]
+  [cite_start]// Draw the progress bars for the group scores [cite: 71-74]
   const groupScoresContainer = document.getElementById('groupScores');
   if (groupScoresContainer) {
     groupScoresContainer.innerHTML = '';
     Object.keys(RESORT_NAMES).forEach(key => {
       const val = counts[key] || 0;
       const pct = responses.length > 0 ? (val / responses.length) * 100 : 0;
+      
       groupScoresContainer.innerHTML += `
         <div class="group-score-bar">
           <div class="group-score-header">
@@ -1084,7 +1088,6 @@ function updateAdminDashboard() {
     });
   }
 }
-
 /* =========================================================
    RESET
 ========================================================= */
