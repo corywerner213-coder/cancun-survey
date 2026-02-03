@@ -986,7 +986,11 @@ let allResponses = [];
             document.getElementById('whyList').innerHTML = getReasons(weights, calculatedWinner).map(r => `<li>${r}</li>`).join('');
 
             // Show results
-            this.style.display = 'none';
+
+document.getElementById('resultsContainer').classList.add('show');
+document.querySelector('.progress-container').style.display = 'none';
+window.scrollTo({top: 0, behavior: 'smooth'});
+
             document.getElementById('resultsContainer').classList.add('show');
             document.querySelector('.progress-container').style.display = 'none';
             window.scrollTo({top: 0, behavior: 'smooth'});
