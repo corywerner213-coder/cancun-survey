@@ -691,6 +691,13 @@
 
                     <div class="group-scores" id="groupScores"></div>
 
+                    <!-- Aggregated Question Scores -->
+                    <div style="margin: 30px 0;">
+                        <h4 style="margin-bottom: 15px;">📊 Group Priority Scores (Avg Importance 1-5)</h4>
+                        <p style="font-size: 13px; color: #666; margin-bottom: 15px;">What the group cares about most:</p>
+                        <div id="aggregatedScores" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;"></div>
+                    </div>
+
                     <h4 style="margin:25px 0 15px 0;">👥 Individual Responses</h4>
                     <div style="overflow-x:auto;">
                         <table class="response-table">
@@ -708,6 +715,7 @@
 
                     <div class="admin-actions">
                         <button onclick="loadCloudData()" class="admin-btn primary">🔄 Refresh</button>
+                        <button onclick="forceCloudRefresh()" class="admin-btn" style="background:#fff3e0; color:#e65100;">☁️ Force Cloud Sync</button>
                         <button onclick="resetAndRetake()" class="admin-btn success">📝 Take Survey Again</button>
                         <button onclick="copyLink()" class="admin-btn" style="background:#e3f2fd; color:#1565c0;">📋 Copy Link</button>
                     </div>
@@ -757,13 +765,16 @@ let currentCalculated = null;
 let currentGut = null;
 let currentFormData = null;
 let hasSubmittedFinal = false;
+let userHasSubmitted = false; // Track if user completed survey this session
+let lastUserScores = null; // Store user's score breakdown for display
 
 // ============================================================
 // CLOUD DATA FUNCTIONS
 // ============================================================
 async function loadCloudData() {
     console.log('Loading cloud data...');
-    document.getElementById('responseCount').textContent = '...';
+    const countEl = document.getElementById('responseCount');
+    if (countEl) countEl.textContent = '...';
     
     try {
         const res = await fetch(BIN_URL + '/latest', {
@@ -775,32 +786,43 @@ async function loadCloudData() {
         }
         
         const data = await res.json();
-        console.log('Raw cloud data:', data);
+        console.log('Raw cloud data:', JSON.stringify(data).substring(0, 500));
         
-        // Handle different possible structures
+        // Handle different possible structures from JSONbin
+        let cloudData = [];
         if (data.record) {
             if (Array.isArray(data.record)) {
-                allResponses = data.record;
+                cloudData = data.record;
             } else if (data.record.responses && Array.isArray(data.record.responses)) {
-                allResponses = data.record.responses;
-            } else if (typeof data.record === 'object') {
-                // Maybe it's an object with numbered keys or something else
-                allResponses = Object.values(data.record).filter(v => v && typeof v === 'object' && v.name);
-            } else {
-                allResponses = [];
+                cloudData = data.record.responses;
+            } else if (typeof data.record === 'object' && data.record !== null) {
+                // Try to extract array from object
+                const values = Object.values(data.record);
+                if (values.length > 0 && typeof values[0] === 'object') {
+                    cloudData = values.filter(v => v && v.name);
+                }
             }
-        } else {
-            allResponses = [];
         }
         
-        // Also merge with localStorage as backup
+        console.log('Parsed cloud responses:', cloudData.length);
+        
+        // Get localStorage data
         const localData = JSON.parse(localStorage.getItem('cancunSurveyResponses') || '[]');
-        if (localData.length > 0 && allResponses.length === 0) {
-            allResponses = localData;
-            console.log('Using localStorage fallback:', allResponses.length, 'entries');
+        console.log('Local responses:', localData.length);
+        
+        // Merge: use cloud data, but add any local entries not in cloud (by id)
+        const cloudIds = new Set(cloudData.map(r => r.id));
+        const uniqueLocal = localData.filter(r => r.id && !cloudIds.has(r.id));
+        
+        allResponses = [...cloudData, ...uniqueLocal];
+        console.log('Total merged responses:', allResponses.length);
+        
+        // If we have local data not in cloud, try to sync it up
+        if (uniqueLocal.length > 0) {
+            console.log('Syncing', uniqueLocal.length, 'local entries to cloud...');
+            syncLocalToCloud();
         }
         
-        console.log('Final responses:', allResponses.length, 'entries');
         updateAdminDashboard();
         
     } catch (e) {
@@ -809,20 +831,60 @@ async function loadCloudData() {
         // Try localStorage fallback
         const localData = JSON.parse(localStorage.getItem('cancunSurveyResponses') || '[]');
         allResponses = localData;
-        console.log('Cloud failed, using localStorage:', allResponses.length, 'entries');
+        console.log('Cloud failed, using localStorage only:', allResponses.length, 'entries');
         
         updateAdminDashboard();
     }
 }
 
+async function syncLocalToCloud() {
+    // Push all local data to cloud
+    const localData = JSON.parse(localStorage.getItem('cancunSurveyResponses') || '[]');
+    if (localData.length === 0) return;
+    
+    try {
+        // Get current cloud data
+        const loadRes = await fetch(BIN_URL + '/latest', {
+            headers: { 'X-Master-Key': API_KEY }
+        });
+        
+        let cloudData = [];
+        if (loadRes.ok) {
+            const data = await loadRes.json();
+            if (data.record && Array.isArray(data.record)) {
+                cloudData = data.record;
+            }
+        }
+        
+        // Merge by id
+        const cloudIds = new Set(cloudData.map(r => r.id));
+        const newEntries = localData.filter(r => r.id && !cloudIds.has(r.id));
+        
+        if (newEntries.length > 0) {
+            const merged = [...cloudData, ...newEntries];
+            await fetch(BIN_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': API_KEY
+                },
+                body: JSON.stringify(merged)
+            });
+            console.log('Synced', newEntries.length, 'entries to cloud');
+        }
+    } catch (e) {
+        console.error('Sync error:', e);
+    }
+}
+
 async function saveToCloud(response) {
-    console.log('Saving response:', response);
+    console.log('Saving response:', response.name);
     
     // Always save to localStorage first as backup
     const localData = JSON.parse(localStorage.getItem('cancunSurveyResponses') || '[]');
     localData.push(response);
     localStorage.setItem('cancunSurveyResponses', JSON.stringify(localData));
-    console.log('Saved to localStorage');
+    console.log('Saved to localStorage, total:', localData.length);
     
     // Now try cloud
     try {
@@ -843,12 +905,38 @@ async function saveToCloud(response) {
             }
         }
         
-        // Add new response
-        existingData.push(response);
+        // Check if this response already exists (by id)
+        const exists = existingData.some(r => r.id === response.id);
+        if (!exists) {
+            existingData.push(response);
+        }
+        
         allResponses = existingData;
         
         // Save back to cloud
         const saveRes = await fetch(BIN_URL, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            },
+            body: JSON.stringify(existingData)
+        });
+        
+        if (saveRes.ok) {
+            console.log('✅ Saved to cloud! Total:', existingData.length);
+            return true;
+        } else {
+            const errText = await saveRes.text();
+            console.error('Cloud save failed:', saveRes.status, errText);
+            return false;
+        }
+        
+    } catch (e) {
+        console.error('Cloud save error:', e);
+        return false;
+    }
+}
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -971,6 +1059,9 @@ document.getElementById('surveyForm').addEventListener('submit', async function(
     document.getElementById('resultsContainer').classList.add('show');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
+    // Mark that user has submitted so we can preserve their view
+    userHasSubmitted = true;
+    
     submitBtn.disabled = false;
     submitBtn.textContent = '🌴 Submit & See My Results';
 });
@@ -1080,6 +1171,68 @@ function updateAdminDashboard() {
             </tr>
         `;
     }).join('');
+    
+    // Calculate and display aggregated question scores
+    const questionLabels = {
+        adults: '1. Adults-Only',
+        pools: '2. Multiple Pools',
+        swimup: '3. Swim-Up Bar',
+        food: '4. Restaurant Variety',
+        beach: '5. Beach Quality',
+        nightlife: '6. Nightlife',
+        golf: '7. Golf Nearby',
+        room: '8. Room Size',
+        modern: '9. Modern Style',
+        lowrise: '10. Low-Rise',
+        airport: '11. Close to Airport',
+        budget: '12. Stay Under Budget'
+    };
+    
+    // Sum up weights from all responses
+    const weightSums = {};
+    const weightCounts = {};
+    CATEGORIES.forEach(cat => {
+        weightSums[cat] = 0;
+        weightCounts[cat] = 0;
+    });
+    
+    allResponses.forEach(r => {
+        if (r.weights) {
+            CATEGORIES.forEach(cat => {
+                if (r.weights[cat] !== undefined) {
+                    weightSums[cat] += r.weights[cat];
+                    weightCounts[cat]++;
+                }
+            });
+        }
+    });
+    
+    // Calculate averages and sort by importance
+    const avgWeights = CATEGORIES.map(cat => ({
+        cat,
+        label: questionLabels[cat],
+        avg: weightCounts[cat] > 0 ? weightSums[cat] / weightCounts[cat] : 0
+    })).sort((a, b) => b.avg - a.avg);
+    
+    // Render aggregated scores
+    const aggregatedEl = document.getElementById('aggregatedScores');
+    if (aggregatedEl) {
+        aggregatedEl.innerHTML = avgWeights.map(item => {
+            const pct = (item.avg / 5) * 100;
+            const color = item.avg >= 4 ? '#4caf50' : item.avg >= 3 ? '#ff9800' : '#9e9e9e';
+            return `
+                <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid ${color};">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="font-size: 13px; font-weight: 500;">${item.label}</span>
+                        <span style="font-weight: 700; color: ${color};">${item.avg.toFixed(1)}</span>
+                    </div>
+                    <div style="height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
+                        <div style="height: 100%; width: ${pct}%; background: ${color}; border-radius: 3px;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
 }
 
 // ============================================================
@@ -1095,6 +1248,13 @@ function showPage(pageId) {
     if (pageId === 'admin') {
         loadCloudData();
     }
+    
+    // When going back to survey page, show results if user already submitted
+    if (pageId === 'survey' && userHasSubmitted) {
+        document.getElementById('surveyForm').style.display = 'none';
+        document.getElementById('resultsContainer').classList.add('show');
+        document.getElementById('progressContainer').style.display = 'none';
+    }
 }
 
 // ============================================================
@@ -1105,12 +1265,54 @@ function copyLink() {
     alert('Link copied! Share with your friends.');
 }
 
+async function forceCloudRefresh() {
+    // Clear local cache and force reload from cloud only
+    console.log('Force refreshing from cloud...');
+    
+    try {
+        const res = await fetch(BIN_URL + '/latest', {
+            headers: { 'X-Master-Key': API_KEY }
+        });
+        
+        if (!res.ok) {
+            alert('Cloud error: ' + res.status);
+            return;
+        }
+        
+        const data = await res.json();
+        console.log('Force refresh - raw data:', data);
+        
+        let cloudData = [];
+        if (data.record) {
+            if (Array.isArray(data.record)) {
+                cloudData = data.record;
+            } else if (typeof data.record === 'object') {
+                // Try to parse as object with entries
+                cloudData = Object.values(data.record).filter(v => v && typeof v === 'object' && v.name);
+            }
+        }
+        
+        allResponses = cloudData;
+        
+        // Also update localStorage to match cloud
+        localStorage.setItem('cancunSurveyResponses', JSON.stringify(cloudData));
+        
+        alert('Loaded ' + cloudData.length + ' responses from cloud');
+        updateAdminDashboard();
+        
+    } catch (e) {
+        console.error('Force refresh error:', e);
+        alert('Error: ' + e.message);
+    }
+}
+
 function resetAndRetake() {
     // Reset state
     currentCalculated = null;
     currentGut = null;
     currentFormData = null;
     hasSubmittedFinal = false;
+    userHasSubmitted = false; // Allow fresh submission
     
     // Reset form
     document.getElementById('surveyForm').reset();
