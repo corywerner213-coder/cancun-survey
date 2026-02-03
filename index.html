@@ -703,6 +703,7 @@
                     <p style="margin:0 0 15px 0; color:#666;">Your response has been saved! Click below to see group results.</p>
                     <button onclick="showPage('admin')" class="admin-btn primary">📊 View Group Results</button>
                     <button onclick="resetSurvey()" class="admin-btn">🔄 Take Survey Again</button>
+                    <button onclick="showPage('admin')" class="admin-btn primary">📊 View Group Results</button>
                 </div>
             </div>
         </div>
@@ -835,23 +836,35 @@ let finalSubmissionChoice = null;
 /* =========================================================
    NAVIGATION
 ========================================================= */
-function showPage(page) {
-  if (showingResults && page === 'survey') return;
+function showPage(pageId) {
+  // 1. Update the tabs (📝 Take Survey vs 📊 View Results) 
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.classList.remove('active');
+    if(tab.getAttribute('onclick').includes(pageId)) tab.classList.add('active');
+  });
 
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  // 2. Switch between the survey and admin pages
+  document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+  document.getElementById(pageId + 'Page').classList.add('active');
 
-  const pageEl = document.getElementById(page + 'Page');
-  if (pageEl) pageEl.classList.add('active');
-
-  const tab = document.querySelector(`.nav-tab[onclick="showPage('${page}')"]`);
-  if (tab) tab.classList.add('active');
-
-  if (page === 'admin') {
-    loadResponses().then(updateAdminDashboard);
+  // 3. Logic for the "Take Survey" tab
+  if (pageId === 'survey') {
+    // If they already finished the survey, show their results. 
+    // Otherwise, show the blank form.
+    if (showingResults) {
+      document.getElementById('surveyForm').style.display = 'none';
+      document.getElementById('resultsContainer').classList.add('show');
+    } else {
+      document.getElementById('surveyForm').style.display = 'block';
+      document.getElementById('resultsContainer').classList.remove('show');
+    }
+  } 
+  
+  // 4. Logic for the "View Results" tab
+  if (pageId === 'admin') {
+    updateAdminDashboard(); // Ensure data is fresh
   }
 }
-
 /* =========================================================
    JSONBIN
 ========================================================= */
@@ -1021,9 +1034,10 @@ async function persistResponse(scores, weights, prefScores, rankScores) {
 ========================================================= */
 function updateAdminDashboard() {
   const responses = allResponses;
+  const countBadge = document.getElementById('responseCount');
+  if (countBadge) countBadge.textContent = responses.length;
 
-  document.getElementById('responseCount').textContent = responses.length;
-  if (!responses.length) {
+  if (!responses || responses.length === 0) {
     document.getElementById('noResponses').style.display = 'block';
     document.getElementById('hasResponses').style.display = 'none';
     return;
@@ -1032,57 +1046,43 @@ function updateAdminDashboard() {
   document.getElementById('noResponses').style.display = 'none';
   document.getElementById('hasResponses').style.display = 'block';
 
-  // Calculate Winner
+  // Tally votes: Use finalChoice IF it exists, otherwise use Recommended
   const counts = { epm: 0, erc: 0, smb: 0, me: 0 };
   responses.forEach(r => {
-      if(r.finalChoice && counts.hasOwnProperty(r.finalChoice)) {
-          counts[r.finalChoice]++;
-      }
+    const vote = r.finalChoice || r.recommended; 
+    if (vote && counts.hasOwnProperty(vote)) {
+      counts[vote]++;
+    }
   });
 
-  const sortedCounts = Object.entries(counts).sort((a,b) => b[1] - a[1]);
-  const winner = sortedCounts[0][0];
-  document.getElementById('groupWinner').textContent = RESORT_NAMES[winner];
-  document.getElementById('groupWinnerScore').textContent = `${sortedCounts[0][1]} Votes`;
+  // Update Winner Banner
+  const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+  const winnerKey = sorted[0][0];
+  const winnerElement = document.getElementById('groupWinner');
+  if (winnerElement) {
+    winnerElement.textContent = RESORT_NAMES[winnerKey] || "Tied";
+    document.getElementById('groupWinnerScore').textContent = `${sorted[0][1]} Total Votes`;
+  }
 
-  // Populate Group Score Bars
+  // Update the visual progress bars for each resort [cite: 71-75]
   const groupScoresContainer = document.getElementById('groupScores');
-  groupScoresContainer.innerHTML = '';
-  
-  Object.keys(RESORT_NAMES).forEach(key => {
-      const votes = counts[key] || 0;
-      const percentage = responses.length > 0 ? (votes / responses.length) * 100 : 0;
-      
+  if (groupScoresContainer) {
+    groupScoresContainer.innerHTML = '';
+    Object.keys(RESORT_NAMES).forEach(key => {
+      const val = counts[key] || 0;
+      const pct = responses.length > 0 ? (val / responses.length) * 100 : 0;
       groupScoresContainer.innerHTML += `
         <div class="group-score-bar">
-            <div class="group-score-header">
-                <span>${RESORT_NAMES[key]}</span>
-                <span>${votes} votes</span>
-            </div>
-            <div class="group-score-track">
-                <div class="group-score-fill ${key}" style="width: ${percentage}%">${votes > 0 ? votes : ''}</div>
-            </div>
-        </div>
-      `;
-  });
-
-  // Populate Individual Table
-  const tbody = document.getElementById('responseTableBody');
-  tbody.innerHTML = '';
-  
-  responses.forEach(r => {
-      const tr = document.createElement('tr');
-      const badgeClass = r.finalChoice; 
-      
-      tr.innerHTML = `
-        <td><strong>${r.name || 'Anonymous'}</strong></td>
-        <td>${RESORT_NAMES[r.recommended] ? RESORT_NAMES[r.recommended].split(' ')[0] : 'Unknown'}</td>
-        <td>${RESORT_NAMES[r.gutChoice] ? RESORT_NAMES[r.gutChoice].split(' ')[0] : 'Unknown'}</td>
-        <td><span class="vote-badge ${badgeClass}">${RESORT_NAMES[r.finalChoice] || 'Unknown'}</span></td>
-        <td></td>
-      `;
-      tbody.appendChild(tr);
-  });
+          <div class="group-score-header">
+            <span>${RESORT_NAMES[key]}</span>
+            <span>${val} votes (${Math.round(pct)}%)</span>
+          </div>
+          <div class="group-score-track">
+            <div class="group-score-fill ${key}" style="width:${pct}%">${val > 0 ? val : ''}</div>
+          </div>
+        </div>`;
+    });
+  }
 }
 
 /* =========================================================
