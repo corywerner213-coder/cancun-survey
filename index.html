@@ -937,29 +937,6 @@ async function saveToCloud(response) {
         return false;
     }
 }
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': API_KEY
-            },
-            body: JSON.stringify(existingData)
-        });
-        
-        if (saveRes.ok) {
-            console.log('✅ Saved to cloud! Total:', existingData.length);
-            return true;
-        } else {
-            const errText = await saveRes.text();
-            console.error('Cloud save failed:', saveRes.status, errText);
-            return false;
-        }
-        
-    } catch (e) {
-        console.error('Cloud save error:', e);
-        // Already saved to localStorage, so not a total loss
-        return false;
-    }
-}
 
 // ============================================================
 // SCORING LOGIC
@@ -1010,57 +987,67 @@ document.getElementById('surveyForm').addEventListener('submit', async function(
     submitBtn.disabled = true;
     submitBtn.textContent = '⏳ Processing...';
     
-    currentFormData = new FormData(this);
-    const { scores, weights, prefScores, rankScores } = calculateScores(currentFormData);
-    
-    // Find calculated winner
-    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-    currentCalculated = sorted[0][0];
-    const maxScore = sorted[0][1];
-    
-    // Get gut choice
-    currentGut = currentFormData.get('gut_choice');
-    
-    // Display results
-    document.getElementById('recommendedResort').textContent = RESORT_NAMES[currentCalculated];
-    document.getElementById('matchScore').textContent = Math.round(maxScore) + '%';
-    document.getElementById('gutChoiceResort').textContent = RESORT_NAMES[currentGut];
-    
-    // Show score breakdown
-    const maxPossible = Math.max(...sorted.map(s => s[1]));
-    document.getElementById('scoreBreakdown').innerHTML = sorted.map(([resort, score], i) => `
-        <div class="score-item ${i === 0 ? 'winner' : ''}">
-            <span class="score-item-name">${RESORT_NAMES[resort]}</span>
-            <div class="score-item-bar"><div class="score-item-fill ${resort}" style="width:${score/maxPossible*100}%"></div></div>
-            <span class="score-item-value">${score.toFixed(1)}</span>
-        </div>
-    `).join('');
-    
-    // Check if calculated matches gut
-    if (currentCalculated === currentGut) {
-        document.getElementById('perfectMatch').style.display = 'block';
-        document.getElementById('matchMessage').style.display = 'none';
-        document.getElementById('gutChoiceNote').textContent = 'Same as calculated!';
+    try {
+        currentFormData = new FormData(this);
+        const { scores, weights, prefScores, rankScores } = calculateScores(currentFormData);
         
-        // Auto-submit since they match
-        await saveResponseWithChoice(currentCalculated, scores, weights, prefScores, rankScores);
-        showFinalSubmission(currentCalculated);
-    } else {
-        document.getElementById('perfectMatch').style.display = 'none';
-        document.getElementById('matchMessage').style.display = 'block';
-        document.getElementById('gutChoiceNote').textContent = 'Different from calculated';
-        document.getElementById('calcChoiceBtn').textContent = RESORT_NAMES[currentCalculated];
-        document.getElementById('gutChoiceBtn').textContent = RESORT_NAMES[currentGut];
+        // Find calculated winner
+        const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+        currentCalculated = sorted[0][0];
+        const maxScore = sorted[0][1];
+        
+        // Get gut choice
+        currentGut = currentFormData.get('gut_choice');
+        
+        // IMMEDIATELY mark as submitted and hide form
+        userHasSubmitted = true;
+        this.style.display = 'none';
+        document.getElementById('progressContainer').style.display = 'none';
+        document.getElementById('resultsContainer').classList.add('show');
+        
+        // Display results
+        document.getElementById('recommendedResort').textContent = RESORT_NAMES[currentCalculated];
+        document.getElementById('matchScore').textContent = Math.round(maxScore) + '%';
+        document.getElementById('gutChoiceResort').textContent = RESORT_NAMES[currentGut];
+        
+        // Show score breakdown
+        const maxPossible = Math.max(...sorted.map(s => s[1]));
+        document.getElementById('scoreBreakdown').innerHTML = sorted.map(([resort, score], i) => `
+            <div class="score-item ${i === 0 ? 'winner' : ''}">
+                <span class="score-item-name">${RESORT_NAMES[resort]}</span>
+                <div class="score-item-bar"><div class="score-item-fill ${resort}" style="width:${score/maxPossible*100}%"></div></div>
+                <span class="score-item-value">${score.toFixed(1)}</span>
+            </div>
+        `).join('');
+        
+        // Check if calculated matches gut
+        if (currentCalculated === currentGut) {
+            document.getElementById('perfectMatch').style.display = 'block';
+            document.getElementById('matchMessage').style.display = 'none';
+            document.getElementById('gutChoiceNote').textContent = 'Same as calculated!';
+            
+            // Auto-submit since they match
+            await saveResponseWithChoice(currentCalculated, scores, weights, prefScores, rankScores);
+            showFinalSubmission(currentCalculated);
+        } else {
+            document.getElementById('perfectMatch').style.display = 'none';
+            document.getElementById('matchMessage').style.display = 'block';
+            document.getElementById('gutChoiceNote').textContent = 'Different from calculated';
+            document.getElementById('calcChoiceBtn').textContent = RESORT_NAMES[currentCalculated];
+            document.getElementById('gutChoiceBtn').textContent = RESORT_NAMES[currentGut];
+        }
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+    } catch (err) {
+        console.error('Form submission error:', err);
+        alert('Error processing survey. Please try again.');
+        // Reset form visibility on error
+        this.style.display = 'block';
+        document.getElementById('progressContainer').style.display = 'block';
+        document.getElementById('resultsContainer').classList.remove('show');
+        userHasSubmitted = false;
     }
-    
-    // Show results
-    this.style.display = 'none';
-    document.getElementById('progressContainer').style.display = 'none';
-    document.getElementById('resultsContainer').classList.add('show');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    // Mark that user has submitted so we can preserve their view
-    userHasSubmitted = true;
     
     submitBtn.disabled = false;
     submitBtn.textContent = '🌴 Submit & See My Results';
