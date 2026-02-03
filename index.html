@@ -1057,6 +1057,9 @@ async function loadResponses() {
 }
 
 async function saveResponseToServer(response) {
+    // ALWAYS load latest first
+    await loadResponses();
+
     const updated = [...allResponses, response];
 
     await fetch(BIN_URL, {
@@ -1068,7 +1071,10 @@ async function saveResponseToServer(response) {
         body: JSON.stringify({ responses: updated })
     });
 
-    allResponses = updated;
+    // Reload again to guarantee sync
+    await loadResponses();
+}
+
 }
 
         // Admin Dashboard
