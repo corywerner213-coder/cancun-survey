@@ -785,6 +785,15 @@
     </div>
 
     <script>
+        // ===============================
+// SHARED STORAGE CONFIG
+// ===============================
+const BIN_URL = "https://api.jsonbin.io/v3/b/69821ad843b1c97be9627691";
+const API_KEY = "$2a$10$ny/JlyejRBBpQLyZLIPE2.BDdEwO3B3ah0ilg9ZvLEl5SvSLuC7MW";
+
+// Shared memory for group results
+let allResponses = [];
+
         // Resort base scores from research
         const RESORT_SCORES = {
             epm: { adultsOnly:10, pools:10, swimUp:10, restaurants:10, beach:7, nightlife:5, golf:10, room:10, style:9, lowRise:10, airport:7, budget:7, spa:9, service:9 },
@@ -1028,6 +1037,32 @@
             responses.push(response);
             localStorage.setItem('cancunResponses', JSON.stringify(responses));
         }
+// ===============================
+// SHARED STORAGE FUNCTIONS
+// ===============================
+async function loadResponses() {
+    const res = await fetch(BIN_URL + "/latest", {
+        headers: { "X-Master-Key": API_KEY }
+    });
+    const data = await res.json();
+    allResponses = data.record.responses || [];
+    return allResponses;
+}
+
+async function saveResponseToServer(response) {
+    const updated = [...allResponses, response];
+
+    await fetch(BIN_URL, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY
+        },
+        body: JSON.stringify({ responses: updated })
+    });
+
+    allResponses = updated;
+}
 
         // Admin Dashboard
         function updateAdminDashboard() {
