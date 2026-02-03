@@ -207,7 +207,7 @@
         <div id="surveyPage" class="page active">
             <div class="progress-container" id="progressContainer">
                 <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-                <div class="progress-text"><span id="progressText">0</span> of 19 questions answered</div>
+                <div class="progress-text"><span id="progressText">0</span> of 21 questions answered</div>
             </div>
 
             <form id="surveyForm">
@@ -556,11 +556,58 @@
                     </div>
                 </div>
 
-                <!-- PART 4: Name -->
+                <!-- PART 4: Additional Questions -->
                 <div class="form-section">
-                    <p class="section-title">📝 Part 4: Your Info</p>
+                    <p class="section-title">📝 Part 4: Final Details</p>
+
                     <div class="question">
-                        <div class="question-title">15. Your Name <span class="required">*</span></div>
+                        <div class="question-title">15. Budget Flexibility? <span class="required">*</span></div>
+                        <div class="options">
+                            <div class="option"><input type="radio" name="budget_flex" id="bf1" value="strict" required><label for="bf1">No - must stay under $3,500</label></div>
+                            <div class="option"><input type="radio" name="budget_flex" id="bf2" value="maybe"><label for="bf2">Maybe - up to $4,000 if worth it</label></div>
+                            <div class="option"><input type="radio" name="budget_flex" id="bf3" value="flexible"><label for="bf3">Yes - willing to spend more for the right place</label></div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">16. Want a swim-up room? <span class="required">*</span></div>
+                        <div class="question-desc">+$100-150/night for pool access from your patio</div>
+                        <div class="options">
+                            <div class="option"><input type="radio" name="swimup_room" id="su1" value="yes" required><label for="su1">Yes!</label></div>
+                            <div class="option"><input type="radio" name="swimup_room" id="su2" value="maybe"><label for="su2">Maybe if budget allows</label></div>
+                            <div class="option"><input type="radio" name="swimup_room" id="su3" value="no"><label for="su3">No, standard room is fine</label></div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">17. Want Club/Excellence Club upgrade? <span class="required">*</span></div>
+                        <div class="question-desc">+$150-200/night for private pools, exclusive restaurant, premium drinks, concierge</div>
+                        <div class="options">
+                            <div class="option"><input type="radio" name="club_upgrade" id="cl1" value="yes" required><label for="cl1">Yes!</label></div>
+                            <div class="option"><input type="radio" name="club_upgrade" id="cl2" value="maybe"><label for="cl2">Maybe if budget allows</label></div>
+                            <div class="option"><input type="radio" name="club_upgrade" id="cl3" value="no"><label for="cl3">No, standard is fine</label></div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">18. Any deal-breakers?</div>
+                        <div class="question-desc">Check all that apply</div>
+                        <div class="options">
+                            <div class="option"><input type="checkbox" id="db1" name="dealbreaker_adults" value="adults"><label for="db1">Must be 100% adults-only (eliminates Majestic)</label></div>
+                            <div class="option"><input type="checkbox" id="db2" name="dealbreaker_nightclub" value="nightclub"><label for="db2">Must have nightclub (only Secrets has one)</label></div>
+                            <div class="option"><input type="checkbox" id="db3" name="dealbreaker_golf" value="golf"><label for="db3">Must have adjacent golf (only Excellence PM)</label></div>
+                            <div class="option"><input type="checkbox" id="db4" name="dealbreaker_budget" value="budget"><label for="db4">Must be under $3,000 (eliminates Secrets)</label></div>
+                            <div class="option"><input type="checkbox" id="db5" name="dealbreaker_none" value="none"><label for="db5">None - I'm flexible!</label></div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">19. Any other thoughts or preferences?</div>
+                        <textarea name="comments" id="comments" placeholder="Anything else you want us to know..."></textarea>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">20. Your Name <span class="required">*</span></div>
                         <input type="text" name="name" id="userName" placeholder="Enter your name" required>
                     </div>
                 </div>
@@ -713,25 +760,69 @@ let hasSubmittedFinal = false;
 // CLOUD DATA FUNCTIONS
 // ============================================================
 async function loadCloudData() {
+    console.log('Loading cloud data...');
     try {
         const res = await fetch(BIN_URL + '/latest', {
             headers: { 'X-Master-Key': API_KEY }
         });
         const data = await res.json();
-        allResponses = Array.isArray(data.record) ? data.record : [];
+        console.log('Raw cloud data:', data);
+        
+        // Handle different possible structures
+        if (data.record) {
+            if (Array.isArray(data.record)) {
+                allResponses = data.record;
+            } else if (data.record.responses && Array.isArray(data.record.responses)) {
+                allResponses = data.record.responses;
+            } else {
+                allResponses = [];
+            }
+        } else {
+            allResponses = [];
+        }
+        
+        console.log('Parsed responses:', allResponses.length, 'entries');
         updateAdminDashboard();
     } catch (e) {
         console.error('Load error:', e);
         allResponses = [];
+        updateAdminDashboard();
     }
 }
 
 async function saveToCloud(response) {
-    await loadCloudData();
+    console.log('Saving response:', response);
+    
+    // First load existing data
+    try {
+        const res = await fetch(BIN_URL + '/latest', {
+            headers: { 'X-Master-Key': API_KEY }
+        });
+        const data = await res.json();
+        
+        // Parse existing responses
+        if (data.record) {
+            if (Array.isArray(data.record)) {
+                allResponses = data.record;
+            } else if (data.record.responses && Array.isArray(data.record.responses)) {
+                allResponses = data.record.responses;
+            } else {
+                allResponses = [];
+            }
+        } else {
+            allResponses = [];
+        }
+    } catch (e) {
+        console.error('Error loading before save:', e);
+        allResponses = [];
+    }
+    
+    // Add new response
     allResponses.push(response);
     
+    // Save back to cloud
     try {
-        await fetch(BIN_URL, {
+        const saveRes = await fetch(BIN_URL, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -739,10 +830,21 @@ async function saveToCloud(response) {
             },
             body: JSON.stringify(allResponses)
         });
-        return true;
+        
+        const result = await saveRes.json();
+        console.log('Save result:', result);
+        
+        if (saveRes.ok) {
+            console.log('✅ Saved successfully! Total responses:', allResponses.length);
+            return true;
+        } else {
+            console.error('Save failed:', result);
+            alert('Error saving. Please try again.');
+            return false;
+        }
     } catch (e) {
         console.error('Save error:', e);
-        alert('Error saving to cloud. Your response may not be recorded.');
+        alert('Error saving to cloud. Check your internet connection.');
         return false;
     }
 }
@@ -887,25 +989,31 @@ function showFinalSubmission(resort) {
 // ADMIN DASHBOARD
 // ============================================================
 function updateAdminDashboard() {
-    document.getElementById('responseCount').textContent = allResponses.length;
+    const countEl = document.getElementById('responseCount');
+    const noResponsesEl = document.getElementById('noResponses');
+    const hasResponsesEl = document.getElementById('hasResponses');
     
-    if (allResponses.length === 0) {
-        document.getElementById('noResponses').style.display = 'block';
-        document.getElementById('hasResponses').style.display = 'none';
+    countEl.textContent = allResponses.length;
+    
+    if (!allResponses || allResponses.length === 0) {
+        noResponsesEl.style.display = 'block';
+        hasResponsesEl.style.display = 'none';
         return;
     }
     
-    document.getElementById('noResponses').style.display = 'none';
-    document.getElementById('hasResponses').style.display = 'block';
+    noResponsesEl.style.display = 'none';
+    hasResponsesEl.style.display = 'block';
     
     // Count final votes
     const counts = { epm: 0, erc: 0, smb: 0, me: 0 };
     allResponses.forEach(r => {
-        const vote = r.finalChoice || r.recommended;
+        const vote = r.finalChoice || r.recommended || r.gutChoice;
         if (vote && counts.hasOwnProperty(vote)) {
             counts[vote]++;
         }
     });
+    
+    console.log('Vote counts:', counts);
     
     // Find winner
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -918,7 +1026,7 @@ function updateAdminDashboard() {
     // Draw score bars
     const maxVotes = Math.max(...Object.values(counts), 1);
     document.getElementById('groupScores').innerHTML = sorted.map(([resort, count]) => {
-        const pct = (count / maxVotes) * 100;
+        const pct = maxVotes > 0 ? (count / maxVotes) * 100 : 0;
         return `
             <div class="group-score-bar">
                 <div class="group-score-header">
@@ -934,13 +1042,17 @@ function updateAdminDashboard() {
     
     // Response table
     document.getElementById('responseTableBody').innerHTML = allResponses.map(r => {
+        const recName = r.recommended ? (RESORT_NAMES[r.recommended]?.split(' ')[1] || r.recommended) : '-';
+        const gutName = r.gutChoice ? (RESORT_NAMES[r.gutChoice]?.split(' ')[1] || r.gutChoice) : '-';
+        const finalName = r.finalChoice ? (RESORT_NAMES[r.finalChoice]?.split(' ')[1] || r.finalChoice) : '-';
         const matchIcon = r.recommended === r.gutChoice ? '✅' : '🔄';
+        
         return `
             <tr>
                 <td>${r.name || 'Anonymous'}</td>
-                <td><span class="vote-badge ${r.recommended}">${RESORT_NAMES[r.recommended]?.split(' ')[1] || '-'}</span></td>
-                <td><span class="vote-badge ${r.gutChoice}">${RESORT_NAMES[r.gutChoice]?.split(' ')[1] || '-'}</span></td>
-                <td><strong>${RESORT_NAMES[r.finalChoice]?.split(' ')[1] || '-'}</strong> ${matchIcon}</td>
+                <td><span class="vote-badge ${r.recommended || ''}">${recName}</span></td>
+                <td><span class="vote-badge ${r.gutChoice || ''}">${gutName}</span></td>
+                <td><strong>${finalName}</strong> ${matchIcon}</td>
             </tr>
         `;
     }).join('');
@@ -971,14 +1083,19 @@ function copyLink() {
 
 // Progress bar
 document.getElementById('surveyForm').addEventListener('change', function() {
-    const radioGroups = ['q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','q11','q12','rank_epm','rank_erc','rank_smb','rank_me','gut_choice'];
+    const radioGroups = [
+        'q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','q11','q12',
+        'rank_epm','rank_erc','rank_smb','rank_me',
+        'gut_choice',
+        'budget_flex','swimup_room','club_upgrade'
+    ];
     let answered = 0;
     radioGroups.forEach(name => {
         if (document.querySelector(`input[name="${name}"]:checked`)) answered++;
     });
     if (document.getElementById('userName').value.trim()) answered++;
     
-    const total = 18;
+    const total = 21; // 12 ratings + 4 rankings + gut + 3 additional + name
     const pct = Math.min((answered / total) * 100, 100);
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressText').textContent = answered;
