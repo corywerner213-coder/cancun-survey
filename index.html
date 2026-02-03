@@ -662,6 +662,7 @@
                 <div style="text-align:center; margin-top:30px; padding:20px; background:#f8f9fa; border-radius:12px;">
                     <p style="margin:0 0 15px 0; color:#666;">Click below to see how the group is voting!</p>
                     <button onclick="showPage('admin')" class="admin-btn primary">📊 View Group Results</button>
+                    <button onclick="resetAndRetake()" class="admin-btn" style="background:#e3f2fd; color:#1565c0; margin-left:10px;">🔄 Take Survey Again</button>
                 </div>
             </div>
         </div>
@@ -707,7 +708,8 @@
 
                     <div class="admin-actions">
                         <button onclick="loadCloudData()" class="admin-btn primary">🔄 Refresh</button>
-                        <button onclick="copyLink()" class="admin-btn success">📋 Copy Link</button>
+                        <button onclick="resetAndRetake()" class="admin-btn success">📝 Take Survey Again</button>
+                        <button onclick="copyLink()" class="admin-btn" style="background:#e3f2fd; color:#1565c0;">📋 Copy Link</button>
                     </div>
                 </div>
             </div>
@@ -761,10 +763,17 @@ let hasSubmittedFinal = false;
 // ============================================================
 async function loadCloudData() {
     console.log('Loading cloud data...');
+    document.getElementById('responseCount').textContent = '...';
+    
     try {
         const res = await fetch(BIN_URL + '/latest', {
             headers: { 'X-Master-Key': API_KEY }
         });
+        
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
         const data = await res.json();
         console.log('Raw cloud data:', data);
         
@@ -774,6 +783,9 @@ async function loadCloudData() {
                 allResponses = data.record;
             } else if (data.record.responses && Array.isArray(data.record.responses)) {
                 allResponses = data.record.responses;
+            } else if (typeof data.record === 'object') {
+                // Maybe it's an object with numbered keys or something else
+                allResponses = Object.values(data.record).filter(v => v && typeof v === 'object' && v.name);
             } else {
                 allResponses = [];
             }
@@ -781,11 +793,24 @@ async function loadCloudData() {
             allResponses = [];
         }
         
-        console.log('Parsed responses:', allResponses.length, 'entries');
+        // Also merge with localStorage as backup
+        const localData = JSON.parse(localStorage.getItem('cancunSurveyResponses') || '[]');
+        if (localData.length > 0 && allResponses.length === 0) {
+            allResponses = localData;
+            console.log('Using localStorage fallback:', allResponses.length, 'entries');
+        }
+        
+        console.log('Final responses:', allResponses.length, 'entries');
         updateAdminDashboard();
+        
     } catch (e) {
         console.error('Load error:', e);
-        allResponses = [];
+        
+        // Try localStorage fallback
+        const localData = JSON.parse(localStorage.getItem('cancunSurveyResponses') || '[]');
+        allResponses = localData;
+        console.log('Cloud failed, using localStorage:', allResponses.length, 'entries');
+        
         updateAdminDashboard();
     }
 }
@@ -793,58 +818,57 @@ async function loadCloudData() {
 async function saveToCloud(response) {
     console.log('Saving response:', response);
     
-    // First load existing data
+    // Always save to localStorage first as backup
+    const localData = JSON.parse(localStorage.getItem('cancunSurveyResponses') || '[]');
+    localData.push(response);
+    localStorage.setItem('cancunSurveyResponses', JSON.stringify(localData));
+    console.log('Saved to localStorage');
+    
+    // Now try cloud
     try {
-        const res = await fetch(BIN_URL + '/latest', {
+        // First load existing cloud data
+        const loadRes = await fetch(BIN_URL + '/latest', {
             headers: { 'X-Master-Key': API_KEY }
         });
-        const data = await res.json();
         
-        // Parse existing responses
-        if (data.record) {
-            if (Array.isArray(data.record)) {
-                allResponses = data.record;
-            } else if (data.record.responses && Array.isArray(data.record.responses)) {
-                allResponses = data.record.responses;
-            } else {
-                allResponses = [];
+        let existingData = [];
+        if (loadRes.ok) {
+            const data = await loadRes.json();
+            if (data.record) {
+                if (Array.isArray(data.record)) {
+                    existingData = data.record;
+                } else if (data.record.responses && Array.isArray(data.record.responses)) {
+                    existingData = data.record.responses;
+                }
             }
-        } else {
-            allResponses = [];
         }
-    } catch (e) {
-        console.error('Error loading before save:', e);
-        allResponses = [];
-    }
-    
-    // Add new response
-    allResponses.push(response);
-    
-    // Save back to cloud
-    try {
+        
+        // Add new response
+        existingData.push(response);
+        allResponses = existingData;
+        
+        // Save back to cloud
         const saveRes = await fetch(BIN_URL, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Master-Key': API_KEY
             },
-            body: JSON.stringify(allResponses)
+            body: JSON.stringify(existingData)
         });
         
-        const result = await saveRes.json();
-        console.log('Save result:', result);
-        
         if (saveRes.ok) {
-            console.log('✅ Saved successfully! Total responses:', allResponses.length);
+            console.log('✅ Saved to cloud! Total:', existingData.length);
             return true;
         } else {
-            console.error('Save failed:', result);
-            alert('Error saving. Please try again.');
+            const errText = await saveRes.text();
+            console.error('Cloud save failed:', saveRes.status, errText);
             return false;
         }
+        
     } catch (e) {
-        console.error('Save error:', e);
-        alert('Error saving to cloud. Check your internet connection.');
+        console.error('Cloud save error:', e);
+        // Already saved to localStorage, so not a total loss
         return false;
     }
 }
@@ -1079,6 +1103,35 @@ function showPage(pageId) {
 function copyLink() {
     navigator.clipboard.writeText(window.location.href);
     alert('Link copied! Share with your friends.');
+}
+
+function resetAndRetake() {
+    // Reset state
+    currentCalculated = null;
+    currentGut = null;
+    currentFormData = null;
+    hasSubmittedFinal = false;
+    
+    // Reset form
+    document.getElementById('surveyForm').reset();
+    
+    // Show form, hide results
+    document.getElementById('surveyForm').style.display = 'block';
+    document.getElementById('resultsContainer').classList.remove('show');
+    document.getElementById('progressContainer').style.display = 'block';
+    
+    // Reset progress bar
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressText').textContent = '0';
+    
+    // Reset results display elements
+    document.getElementById('perfectMatch').style.display = 'none';
+    document.getElementById('matchMessage').style.display = 'none';
+    document.getElementById('finalSubmission').style.display = 'none';
+    
+    // Go to survey page
+    showPage('survey');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // Progress bar
