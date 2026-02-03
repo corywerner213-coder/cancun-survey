@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🏝️ Cancun Resort Survey - June 2025</title>
+    
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 20px; min-height: 100vh; }
@@ -203,6 +204,11 @@
             .ranking-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
             .nav-tabs { flex-wrap: wrap; }
         }
+        /* --- LOCK SURVEY WHEN SHOWING RESULTS --- */
+.results-mode #surveyForm {
+    display: none !important;
+}
+
     </style>
 </head>
 <body>
@@ -814,16 +820,31 @@ let allResponses = [];
         const CAT_NAMES = {adultsOnly:'Adults Only',pools:'Pools',swimUp:'Swim-Up Bar',restaurants:'Restaurants',beach:'Beach',nightlife:'Nightlife',golf:'Golf',room:'Room Size',style:'Style',lowRise:'Low-Rise',airport:'Airport',budget:'Budget',spa:'Spa',service:'Service'};
 
         // Page navigation
-        function showPage(page) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(page + 'Page').classList.add('active');
-            document.querySelector(`[onclick="showPage('${page}')"]`).classList.add('active');
-            if (page === 'admin') {
+function showPage(page) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+    // Deactivate tabs
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+    // Activate requested page
+    const pageEl = document.getElementById(page + 'Page');
+    if (pageEl) pageEl.classList.add('active');
+
+    // Activate nav tab safely
+    const tab = document.querySelector(`.nav-tab[onclick="showPage('${page}')"]`);
+    if (tab) tab.classList.add('active');
+
+    // Load admin data ONLY when needed
+    if (page === 'admin') {
     loadResponses().then(() => {
         updateAdminDashboard();
     });
 }
+
+    }
+}
+
 
         }
 
@@ -994,6 +1015,8 @@ window.scrollTo({top: 0, behavior: 'smooth'});
             document.getElementById('resultsContainer').classList.add('show');
             document.querySelector('.progress-container').style.display = 'none';
             window.scrollTo({top: 0, behavior: 'smooth'});
+            document.getElementById('surveyPage').classList.add('results-mode');
+
         });
 
         function submitFinalChoice(choice) {
@@ -1052,12 +1075,27 @@ window.scrollTo({top: 0, behavior: 'smooth'});
 // SHARED STORAGE FUNCTIONS
 // ===============================
 async function loadResponses() {
-    const res = await fetch(BIN_URL + "/latest", {
-        headers: { "X-Master-Key": API_KEY }
-    });
-    const data = await res.json();
-    allResponses = data.record.responses || [];
-    return allResponses;
+    try {
+        const res = await fetch(BIN_URL + "/latest", {
+            headers: {
+                "X-Master-Key": API_KEY
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error("JSONBin fetch failed");
+        }
+
+        const data = await res.json();
+        allResponses = Array.isArray(data?.record?.responses)
+            ? data.record.responses
+            : [];
+
+        console.log("JSONBin loaded responses:", allResponses);
+    } catch (err) {
+        console.error("JSONBin load error:", err);
+        allResponses = [];
+    }
 }
 
 async function saveResponseToServer(response) {
@@ -1087,11 +1125,14 @@ async function saveResponseToServer(response) {
 
             document.getElementById('responseCount').textContent = responses.length;
 
-            if (responses.length === 0) {
-                document.getElementById('noResponses').style.display = 'block';
-                document.getElementById('hasResponses').style.display = 'none';
-                return;
-            }
+if (responses.length === 0) {
+    document.getElementById('noResponses').style.display = 'block';
+    document.getElementById('hasResponses').style.display = 'none';
+    document.getElementById('responseCount').textContent = "0";
+    return;
+}
+
+
             document.getElementById('noResponses').style.display = 'none';
             document.getElementById('hasResponses').style.display = 'block';
 
@@ -1228,6 +1269,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 function resetSurvey() {
     // Show form again
     document.getElementById('surveyForm').style.display = 'block';
+    document.getElementById('surveyPage').classList.remove('results-mode');
 
     // Hide results
     document.getElementById('resultsContainer').classList.remove('show');
