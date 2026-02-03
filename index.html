@@ -200,7 +200,7 @@
     <div class="container">
         <div class="nav-tabs">
             <button class="nav-tab active" onclick="showPage('survey')">📝 Take Survey</button>
-            <button class="nav-tab" onclick="showPage('admin')">📊 View Results</button>
+        <button class="nav-tab" onclick="showPage('adminPage')">📊 View Group Results</button>
         </div>
 
         <!-- SURVEY PAGE -->
@@ -1086,7 +1086,10 @@ async function saveResponseWithChoice(finalChoice, scores, weights, prefScores, 
 function showFinalSubmission(resort) {
     document.getElementById('finalSubmission').style.display = 'block';
     document.getElementById('finalChoiceDisplay').textContent = RESORT_NAMES[resort];
-    showPage('admin');
+    
+    // ADD THIS LINE BELOW to automatically switch to the results view
+    showPage('adminPage');
+}
 }
 
 // ============================================================
