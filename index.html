@@ -1149,17 +1149,40 @@ async function saveResponseToServer(response) {
             `}).join('');
         }
 
-        function deleteResponse(index) {
-            if (!confirm('Delete this response?')) return;
-            const responses = JSON.parse(localStorage.getItem('cancunResponses') || '[]');
-            responses.splice(index, 1);
-            localStorage.setItem('cancunResponses', JSON.stringify(responses));
-            updateAdminDashboard();
+       async function deleteResponse(index) {
+    if (!confirm('Delete this response?')) return;
+
+    allResponses.splice(index, 1);
+
+    await fetch(BIN_URL, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY
+        },
+        body: JSON.stringify({ responses: allResponses })
+    });
+
+    updateAdminDashboard();
+}
+
         }
 
-        function clearAllResponses() {
-            localStorage.removeItem('cancunResponses');
-            updateAdminDashboard();
+       async function clearAllResponses() {
+    allResponses = [];
+
+    await fetch(BIN_URL, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY
+        },
+        body: JSON.stringify({ responses: [] })
+    });
+
+    updateAdminDashboard();
+}
+
         }
 
         function copyLink() {
@@ -1168,7 +1191,8 @@ async function saveResponseToServer(response) {
         }
 
         function exportResults() {
-            const responses = JSON.parse(localStorage.getItem('cancunResponses') || '[]');
+          const responses = allResponses;
+
             if (!responses.length) return alert('No responses to export');
             
             let csv = 'Name,Calculated,Gut Choice,Final Choice,Match,Date\n';
