@@ -714,6 +714,7 @@
                 <div style="text-align:center; margin-top:30px; padding:20px; background:#f8f9fa; border-radius:12px;">
                     <p style="margin:0 0 15px 0; color:#666;">Your response has been saved! Click below to see group results.</p>
                     <button onclick="showPage('admin')" class="admin-btn primary">📊 View Group Results</button>
+                    <button onclick="resetSurvey()" class="admin-btn">🔄 Take Survey Again</button>
                 </div>
             </div>
         </div>
@@ -1190,6 +1191,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadResponses();
     updateAdminDashboard();
 });
+function resetSurvey() {
+    // Show form again
+    document.getElementById('surveyForm').style.display = 'block';
+
+    // Hide results
+    document.getElementById('resultsContainer').classList.remove('show');
+    document.getElementById('finalSubmission').style.display = 'none';
+    document.getElementById('matchMessage').style.display = 'none';
+    document.getElementById('perfectMatch').style.display = 'none';
+
+    // Clear form inputs
+    document.getElementById('surveyForm').reset();
+
+    // Reset progress bar
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressText').textContent = '0';
+    document.querySelector('.progress-container').style.display = 'block';
+
+    // Reset globals
+    currentFormData = null;
+    calculatedWinner = null;
+    gutChoice = null;
+    finalSubmissionChoice = null;
+
+    // Go back to survey page
+    showPage('survey');
+
+    // Scroll up
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
     </script>
 </body>
