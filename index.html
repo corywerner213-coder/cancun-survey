@@ -502,7 +502,7 @@
                 </div>
 
                 <div class="submit-section">
-                    <button type="submit" class="submit-btn" id="submitBtn">🌴 Submit & See Results</button>
+                    <button type="button" class="submit-btn" id="submitBtn" onclick="handleSubmit()">🌴 Submit & See Results</button>
                 </div>
             </form>
 
@@ -700,20 +700,31 @@ function calcScores(fd) {
 }
 
 // FORM SUBMIT
-document.getElementById('surveyForm').onsubmit = function(e) {
-    e.preventDefault();
+function handleSubmit() {
+    // Validate required fields
+    const form = document.getElementById('surveyForm');
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
     
-    formData = new FormData(this);
+    console.log('Form submitted!');
+    
+    formData = new FormData(form);
     const { final, weights, pref, rank } = calcScores(formData);
     
     const sorted = Object.entries(final).sort((a,b) => b[1] - a[1]);
     calcWinner = sorted[0][0];
     gutChoice = formData.get('gut_choice');
     
-    // Show results immediately
+    console.log('Calculated:', calcWinner, 'Gut:', gutChoice);
+    
+    // Hide form, show results
     document.getElementById('surveyForm').style.display = 'none';
     document.getElementById('progressContainer').style.display = 'none';
     document.getElementById('resultsContainer').style.display = 'block';
+    
+    console.log('Results container shown');
     
     document.getElementById('recommendedResort').textContent = NAMES[calcWinner];
     document.getElementById('matchScore').textContent = Math.round(sorted[0][1]) + '%';
@@ -732,6 +743,7 @@ document.getElementById('surveyForm').onsubmit = function(e) {
         document.getElementById('perfectMatch').style.display = 'block';
         document.getElementById('matchMessage').style.display = 'none';
         document.getElementById('gutChoiceNote').textContent = 'Same!';
+        // Save in background
         saveFinal(calcWinner, final, weights);
     } else {
         document.getElementById('perfectMatch').style.display = 'none';
@@ -742,7 +754,7 @@ document.getElementById('surveyForm').onsubmit = function(e) {
     }
     
     window.scrollTo({top: 0, behavior: 'smooth'});
-};
+}
 
 // SUBMIT FINAL CHOICE
 function submitFinal(type) {
