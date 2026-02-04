@@ -587,12 +587,57 @@
                     <button onclick="loadData()" class="admin-btn primary">🔄 Refresh</button>
                     <button onclick="retakeSurvey()" class="admin-btn success">📝 Take Survey</button>
                     <button onclick="clearAllData()" class="admin-btn danger">🗑️ Clear All Data</button>
+                    <button onclick="testSave()" class="admin-btn" style="background:#fff3e0;color:#e65100;">🧪 Test Save</button>
+                </div>
+                
+                <!-- DEBUG PANEL -->
+                <div id="debugPanel" style="margin-top:20px; padding:15px; background:#1a1a2e; border-radius:8px; font-family:monospace; font-size:12px; color:#0f0; max-height:300px; overflow-y:auto;">
+                    <div style="color:#888; margin-bottom:10px;">Debug Log (newest first):</div>
+                    <div id="debugLog"></div>
                 </div>
             </div>
         </div>
     </div>
 
 <script>
+// DEBUG LOGGING
+function debugLog(msg, data = null) {
+    const log = document.getElementById('debugLog');
+    const time = new Date().toLocaleTimeString();
+    let html = `<div style="margin-bottom:5px;border-bottom:1px solid #333;padding-bottom:5px;">`;
+    html += `<span style="color:#888;">[${time}]</span> ${msg}`;
+    if (data !== null) {
+        html += `<pre style="color:#ff0;margin:5px 0;white-space:pre-wrap;word-break:break-all;">${JSON.stringify(data, null, 2)}</pre>`;
+    }
+    html += `</div>`;
+    if (log) {
+        log.innerHTML = html + log.innerHTML;
+    }
+    console.log(msg, data);
+}
+
+// TEST SAVE FUNCTION
+async function testSave() {
+    debugLog('🧪 Testing save with dummy data...');
+    const testEntry = {
+        id: 'test_' + Date.now(),
+        name: 'TEST USER',
+        time: new Date().toISOString(),
+        recommended: 'epm',
+        gutChoice: 'epm',
+        finalChoice: 'epm',
+        scores: {epm: 80, erc: 70, smb: 60, me: 50},
+        weights: {adults: 5, pools: 3}
+    };
+    const success = await saveData(testEntry);
+    if (success) {
+        debugLog('✅ Test save successful! Refreshing data...');
+        await loadData();
+    } else {
+        debugLog('❌ Test save FAILED');
+    }
+}
+
 // CONFIG
 const BIN_ID = '69821ad843b1c97be9627691';
 const API_KEY = '$2a$10$ny/JlyejRBBpQLyZLIPE2.BDdEwO3B3ah0ilg9ZvLEl5SvSLuC7MW';
@@ -627,21 +672,22 @@ let submitted = false;
 
 // LOAD DATA FROM CLOUD
 async function loadData() {
-    console.log('Loading data from cloud...');
+    debugLog('📥 Loading data from cloud...');
     try {
         const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': API_KEY } });
+        debugLog('Response status: ' + res.status);
         if (!res.ok) {
-            console.error('Load failed:', res.status);
+            debugLog('❌ Load failed: ' + res.status);
             allData = [];
             updateAdmin();
             return;
         }
         const json = await res.json();
-        console.log('Raw cloud response:', json);
+        debugLog('Raw cloud response:', json);
         allData = Array.isArray(json.record) ? json.record : [];
-        console.log('Loaded', allData.length, 'responses');
+        debugLog('✅ Loaded ' + allData.length + ' responses');
     } catch(e) {
-        console.error('Load error:', e);
+        debugLog('❌ Load error: ' + e.message);
         allData = [];
     }
     updateAdmin();
@@ -649,22 +695,25 @@ async function loadData() {
 
 // SAVE DATA TO CLOUD
 async function saveData(entry) {
-    console.log('Saving entry:', entry);
+    debugLog('📤 Saving entry...', entry);
     try {
         // Get fresh data first
+        debugLog('Fetching current data...');
         const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': API_KEY } });
         if (!res.ok) {
-            console.error('Load failed:', res.status);
+            debugLog('❌ Load failed: ' + res.status);
             return false;
         }
         const json = await res.json();
-        console.log('Current cloud data:', json);
+        debugLog('Current data count: ' + (Array.isArray(json.record) ? json.record.length : 0));
         let current = Array.isArray(json.record) ? json.record : [];
         
         // Add new entry
         current.push(entry);
+        debugLog('New total will be: ' + current.length);
         
         // Save back
+        debugLog('Sending PUT request...');
         const saveRes = await fetch(BIN_URL, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
@@ -672,15 +721,16 @@ async function saveData(entry) {
         });
         
         if (!saveRes.ok) {
-            console.error('Save failed:', saveRes.status, await saveRes.text());
+            const errText = await saveRes.text();
+            debugLog('❌ Save failed: ' + saveRes.status, errText);
             return false;
         }
         
         allData = current;
-        console.log('✅ Saved successfully! Total entries:', current.length);
+        debugLog('✅ SAVED! Total entries: ' + current.length);
         return true;
     } catch(e) {
-        console.error('Save error:', e);
+        debugLog('❌ Save error: ' + e.message);
         return false;
     }
 }
@@ -789,7 +839,11 @@ function submitFinal(type) {
 }
 
 async function saveFinal(choice, scores, weights) {
-    if (submitted) return;
+    debugLog('🎯 saveFinal called with choice: ' + choice);
+    if (submitted) {
+        debugLog('⚠️ Already submitted, skipping');
+        return;
+    }
     submitted = true;
     
     document.getElementById('finalSubmission').style.display = 'block';
@@ -805,7 +859,9 @@ async function saveFinal(choice, scores, weights) {
         scores, weights
     };
     
-    await saveData(entry);
+    debugLog('📝 Created entry, calling saveData...');
+    const success = await saveData(entry);
+    debugLog(success ? '✅ Entry saved!' : '❌ Entry NOT saved');
 }
 
 // UPDATE ADMIN
