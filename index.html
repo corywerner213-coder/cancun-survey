@@ -485,10 +485,11 @@
                     <div class="question">
                         <div class="question-title">18. Deal-breakers?</div>
                         <div class="options">
-                            <div class="option"><input type="checkbox" id="db1" name="db_adults"><label for="db1">Must be 100% adults-only</label></div>
-                            <div class="option"><input type="checkbox" id="db2" name="db_nightclub"><label for="db2">Must have nightclub</label></div>
-                            <div class="option"><input type="checkbox" id="db3" name="db_golf"><label for="db3">Must have adjacent golf</label></div>
-                            <div class="option"><input type="checkbox" id="db4" name="db_budget"><label for="db4">Must be under $3,000</label></div>
+                            <div class="option"><input type="checkbox" id="db1" name="db_adults"><label for="db1">Must be 100% adults-only (eliminates Majestic)</label></div>
+                            <div class="option"><input type="checkbox" id="db2" name="db_nightclub"><label for="db2">Must have nightclub (only Secrets has one)</label></div>
+                            <div class="option"><input type="checkbox" id="db3" name="db_golf"><label for="db3">Must have adjacent golf (only Excellence PM)</label></div>
+                            <div class="option"><input type="checkbox" id="db4" name="db_budget"><label for="db4">Must be under $3,000 (eliminates Secrets)</label></div>
+                            <div class="option"><input type="checkbox" id="db5" name="db_none"><label for="db5">None - I'm flexible!</label></div>
                         </div>
                     </div>
                     <div class="question">
@@ -626,10 +627,19 @@ let submitted = false;
 
 // LOAD DATA FROM CLOUD
 async function loadData() {
+    console.log('Loading data from cloud...');
     try {
         const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': API_KEY } });
+        if (!res.ok) {
+            console.error('Load failed:', res.status);
+            allData = [];
+            updateAdmin();
+            return;
+        }
         const json = await res.json();
+        console.log('Raw cloud response:', json);
         allData = Array.isArray(json.record) ? json.record : [];
+        console.log('Loaded', allData.length, 'responses');
     } catch(e) {
         console.error('Load error:', e);
         allData = [];
@@ -639,26 +649,39 @@ async function loadData() {
 
 // SAVE DATA TO CLOUD
 async function saveData(entry) {
+    console.log('Saving entry:', entry);
     try {
         // Get fresh data first
         const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': API_KEY } });
+        if (!res.ok) {
+            console.error('Load failed:', res.status);
+            return false;
+        }
         const json = await res.json();
+        console.log('Current cloud data:', json);
         let current = Array.isArray(json.record) ? json.record : [];
         
         // Add new entry
         current.push(entry);
         
         // Save back
-        await fetch(BIN_URL, {
+        const saveRes = await fetch(BIN_URL, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
             body: JSON.stringify(current)
         });
         
+        if (!saveRes.ok) {
+            console.error('Save failed:', saveRes.status, await saveRes.text());
+            return false;
+        }
+        
         allData = current;
-        console.log('Saved! Total:', current.length);
+        console.log('✅ Saved successfully! Total entries:', current.length);
+        return true;
     } catch(e) {
         console.error('Save error:', e);
+        return false;
     }
 }
 
