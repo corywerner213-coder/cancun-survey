@@ -838,6 +838,47 @@ function submitFinal(type) {
     document.getElementById('matchMessage').style.display = 'none';
 }
 
+// RETRY SAVE
+async function retrySave() {
+    const { final, weights } = calcScores(formData);
+    const choice = document.getElementById('finalSubmission').dataset.choice || calcWinner;
+    
+    document.getElementById('finalSubmission').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+    document.getElementById('finalSubmission').innerHTML = `
+        <div style="color: rgba(255,255,255,0.8);">⏳ RETRYING...</div>
+        <div style="font-size: 18px; color: white;">Please wait!</div>
+    `;
+    
+    const entry = {
+        id: Date.now().toString(),
+        name: formData.get('name'),
+        time: new Date().toISOString(),
+        recommended: calcWinner,
+        gutChoice: gutChoice,
+        finalChoice: choice,
+        scores: final, 
+        weights
+    };
+    
+    const success = await saveData(entry);
+    
+    if (success) {
+        submitted = true;
+        document.getElementById('finalSubmission').innerHTML = `
+            <div style="color: rgba(255,255,255,0.8);">✅ SAVED!</div>
+            <div style="font-size: 22px; font-weight: 700; color: white;">${NAMES[choice]}</div>
+            <div style="color: rgba(255,255,255,0.8); margin-top: 10px;">Your vote has been recorded!</div>
+        `;
+    } else {
+        document.getElementById('finalSubmission').style.background = '#c62828';
+        document.getElementById('finalSubmission').innerHTML = `
+            <div style="color: white;">❌ STILL FAILED</div>
+            <div style="font-size: 16px; color: white; margin: 10px 0;">Check your internet connection</div>
+            <button onclick="retrySave()" style="padding: 12px 24px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; background: white; color: #c62828; cursor: pointer;">🔄 TAP TO RETRY</button>
+        `;
+    }
+}
+
 async function saveFinal(choice, scores, weights) {
     debugLog('🎯 saveFinal called with choice: ' + choice);
     if (submitted) {
@@ -859,9 +900,31 @@ async function saveFinal(choice, scores, weights) {
         scores, weights
     };
     
+    // Show saving indicator
+    document.getElementById('finalSubmission').innerHTML = `
+        <div style="color: rgba(255,255,255,0.8);">⏳ SAVING...</div>
+        <div style="font-size: 18px; color: white;">Please wait, do not close this page!</div>
+    `;
+    
     debugLog('📝 Created entry, calling saveData...');
     const success = await saveData(entry);
     debugLog(success ? '✅ Entry saved!' : '❌ Entry NOT saved');
+    
+    if (success) {
+        document.getElementById('finalSubmission').innerHTML = `
+            <div style="color: rgba(255,255,255,0.8);">✅ SAVED!</div>
+            <div style="font-size: 22px; font-weight: 700; color: white;">${NAMES[choice]}</div>
+            <div style="color: rgba(255,255,255,0.8); margin-top: 10px;">Your vote has been recorded!</div>
+        `;
+    } else {
+        document.getElementById('finalSubmission').style.background = '#c62828';
+        document.getElementById('finalSubmission').innerHTML = `
+            <div style="color: white;">❌ SAVE FAILED</div>
+            <div style="font-size: 16px; color: white; margin: 10px 0;">Your vote was NOT recorded!</div>
+            <button onclick="retrySave()" style="padding: 12px 24px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; background: white; color: #c62828; cursor: pointer;">🔄 TAP TO RETRY</button>
+        `;
+        submitted = false; // Allow retry
+    }
 }
 
 // UPDATE ADMIN
